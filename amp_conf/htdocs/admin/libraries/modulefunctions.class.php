@@ -1631,23 +1631,45 @@ class module_functions {
 		}
 
 		$extension = pathinfo($filename,PATHINFO_EXTENSION);
+		if(preg_match('/^(gpg)$/', $extension)) {
+			try {
+				if(!FreePBX::GPG()->verifyFile($filename)) {
+					return array(sprintf(_('File Integrity failed for %s - aborting (GPG Verify File check failed)'), $filename));
+				}
+			} catch(\Exception $e) {
+				return array(sprintf(_('File Integrity failed for %s - aborting (Cause: %s)'), $filename, $e->getMessage()));
+			}
+			try {
+				$filename = FreePBX::GPG()->getFile($filename);
+				if(!file_exists($filename)) {
+					return array(sprintf(_('Could not find extracted module: %s'), $filename));
+				}
+				$extension = pathinfo($filename,PATHINFO_EXTENSION);
+			} catch(\Exception $e) {
+				return array(sprintf(_('Unable to work with GPG file, message was: %s'), $e->getMessage()));
+			}
+		}
 		switch(true) {
-			case preg_match('/^(tgz|tar)$/', $extension) || preg_match('/^(tar\.gz)$/', $filename):
-				exec("/usr/bin/env tar zxf ".escapeshellarg($filename)." -C ".escapeshellarg($temppath), $output, $exitcode);
+			case preg_match('/^(tgz|tar)$/', $extension) || preg_match('/(tar\.gz)$/', $filename):
+				$err = exec("/usr/bin/env tar zxf ".escapeshellarg($filename)." -C ".escapeshellarg($temppath), $output, $exitcode);
 				if ($exitcode != 0) {
-					return array(sprintf(_('Could not remove temp storage at %s'), $temppath));
+					return array(sprintf(_('Error from %s: %s'), 'tar', $err));
 				}
 			break;
 			case preg_match('/^(zip)$/', $extension):
-				exec("/usr/bin/env unzip  ".escapeshellarg($filename)." -d ".escapeshellarg($temppath), $output, $exitcode);
+				exec("/usr/bin/env unzip", $output, $exitcode);
 				if ($exitcode != 0) {
-					return array(sprintf(_('Could not remove temp storage at %s'), $temppath));
+					return array(_("The binary unzip is not installed. Unable to work with zip file"));
+				}
+				$err = exec("/usr/bin/env unzip  ".escapeshellarg($filename)." -d ".escapeshellarg($temppath), $output, $exitcode);
+				if ($exitcode != 0) {
+					return array(sprintf(_('Error from %s: %s'), 'unzip', $err));
 				}
 			break;
 			case preg_match('/^(bz2|bz|tbz2|tbz)$/', $extension):
-				exec("/usr/bin/env tar xjf ".escapeshellarg($filename)." -C ".escapeshellarg($temppath), $output, $exitcode);
+				$err = exec("/usr/bin/env tar xjf ".escapeshellarg($filename)." -C ".escapeshellarg($temppath), $output, $exitcode);
 				if ($exitcode != 0) {
-					return array(sprintf(_('Could not remove temp storage at %s'), $temppath));
+					return array(sprintf(_('Error from %s: %s'), 'tar', $err));
 				}
 			break;
 			default:
@@ -1755,7 +1777,7 @@ class module_functions {
 
 		if (!$force) {
 
-			if (!in_array($modules[$modulename]['status'], array(MODULE_STATUS_NOTINSTALLED, MODULE_STATUS_NEEDUPGRADE))) {
+			if (!in_array($modules[$modulename]['status'], array(MODULE_STATUS_ENABLED, MODULE_STATUS_NOTINSTALLED, MODULE_STATUS_NEEDUPGRADE))) {
 				//return array(_("This module is already installed."));
 				// This isn't really an error, we just exit
 				return true;
@@ -1850,7 +1872,7 @@ class module_functions {
 		$this->upgrade_notifications($new_modules, 'PASSIVE');
 		needreload();
 		FreePBX::Config()->update("SIGNATURECHECK", true);
-		FreePBX::Database()->query("DELETE FROM admin WHERE variable = 'unsigned' LIMIT 1");
+		$db->query("DELETE FROM admin WHERE variable = 'unsigned' LIMIT 1");
 
 		//Generate LESS on install
 		//http://issues.freepbx.org/browse/FREEPBX-8287
@@ -2232,7 +2254,7 @@ class module_functions {
 							return false;
 						}
 					} catch(Exception $e) {
-						dbug("Error Returned was: ".$e->getMessage());
+						out("Install error! ".$e->getMessage());
 						return false;
 					}
 				}
@@ -2849,7 +2871,7 @@ class module_functions {
 	* Get all Cached Signatures, update if it doesnt exist
 	* @param {bool} $cached=true Whether to use cached data or not
 	*/
-	function getAllSignatures($cached=true) {
+	function getAllSignatures($cached=true, $online = false) {
 		FreePBX::GPG(); //declare class to get constants
 		$sql = "SELECT modulename, signature FROM modules";
 		$sth = FreePBX::Database()->prepare($sql);
@@ -2860,7 +2882,7 @@ class module_functions {
 		// String below, if i18n'ed, must be identical to that in GPG class.
 		// Read the comment there.
 		$amportal = FreePBX::Config()->get('AMPSBIN')."/amportal "._("altered");
-		if(!$cached) {
+		if(!$cached && $online) {
 			FreePBX::GPG()->refreshKeys();
 		}
 		foreach($res as $mod) {

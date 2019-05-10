@@ -26,6 +26,10 @@ $html .= '<meta http-equiv="Content-Type" content="text/html;charset=utf-8">'
 		. '<meta name="robots" content="noindex" />'
 		. '<link rel="shortcut icon" href="' . $amp_conf['BRAND_IMAGE_FAVICON'] . '">';
 
+//not supported in some browsers but will solve issues when switching from
+//http to https
+$html .= '<meta name="referrer" content="always">';
+
 //CSS First THEN JS (http://uxmovement.com/content/why-you-should-place-style-sheets-before-scripts/)
 //less compiled into css
 foreach($compiled_less_files as $file) {
@@ -59,6 +63,9 @@ if ($amp_conf['BRAND_CSS_CUSTOM']) {
 $html .= '<!--[if lt IE 9]>';
 $html .= '<script src="assets/js/html5shiv.js"></script>';
 $html .= '<![endif]-->';
+$html .= '<!--[if lte IE 9]>';
+$html .= '<script src="assets/js/XMLHttpRequest.js"></script>';
+$html .= '<![endif]-->';
 //Javascripts
 $html .= '<script type="text/javascript" src="assets/js/modernizr.js"></script>';
 $html .= '<script type="text/javascript" src="assets/js/browser-support.js"></script>';
@@ -82,6 +89,8 @@ $html .= '<script type="text/javascript" src="assets/js/jquery-' . $amp_conf['JQ
 if($amp_conf['JQMIGRATE']) {
 	$html .= '<script type="text/javascript" src="assets/js/jquery-migrate-1.2.1.js"></script>';
 }
+
+$html .= '<script type="text/javascript" src="assets/js/class.js"></script>';
 
 $html .= '</head>';
 

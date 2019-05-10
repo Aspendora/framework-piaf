@@ -117,7 +117,7 @@ function install_parse_asterisk_conf($filename) {
 	$file = file($filename);
 	foreach ($file as $line) {
 		if (preg_match("/^\s*([a-zA-Z0-9]+)\s* (?:=>|=) \s*(.*)\s*([;#].*)?/",$line,$matches)) {
-			$conf[ $matches[1] ] = $matches[2];
+			$asterisk_conf[ $matches[1] ] = $matches[2];
 		}
 	}
 	// Now set defaults if not set (although asterisk should fail if not set but at least
@@ -131,7 +131,7 @@ function install_parse_asterisk_conf($filename) {
 	if (!isset($asterisk_conf['astrundir']))    { $asterisk_conf['astrundir']    = "/var/run/asterisk"; }
 	if (!isset($asterisk_conf['astlogdir']))    { $asterisk_conf['astlogdir']    = "/var/log/asterisk"; }
 
-	return $conf;
+	return $asterisk_conf;
 }
 
 function write_amportal_conf($filename, $conf) {
@@ -164,6 +164,8 @@ function write_amportal_conf($filename, $conf) {
 
 function ask_overwrite($file1, $file2) {
 	global $check_md5s;
+	#Force Overwrite option
+	if( $check_md5s == false ); return true;
 	do {
 		out($file2." has been changed from the original version.");
 		outn("Overwrite (y=yes/a=all/n=no/d=diff/s=shell/x=exit)? ");
@@ -229,7 +231,11 @@ function generate_configs() {
 		//
 		// TODO: Should check if Asterisk is running and/or try to start it.
 		//
+        //parse_amportal_conf from libraries/BMO/Freepbx_conf.class.php needs amportal.conf RO to be parsed
+        //avoid AMPMGRPASS warning at first run
+		passthru("chmod 440 /etc/amportal.conf");
 		passthru("sudo -u $runas_uid ".trim($amp_conf["AMPBIN"])."/retrieve_conf --run-install --skip-registry-checks ".($debug ? ' --debug' : ''));
+		passthru("chmod 660 /etc/amportal.conf");
 	}
 }
 
@@ -1274,7 +1280,9 @@ $verinfo = $tmpout;
 //  Set the 'engine' to be 'asterisk14' if using asterisk 1.4, otherwise
 //  'asterisk'
 outn("Checking for Asterisk version..");
-if ((preg_match('/^Asterisk (\d+(\.\d+)*)(-?(.*))$/', $verinfo, $matches)) || (preg_match('/^Asterisk SVN-(\d+(\.\d+)*)(-?(.*))$/', $verinfo, $matches))) {
+if ((preg_match('/^Asterisk (\d+(\.\d+)*)(-?(.*))$/', $verinfo, $matches)) || 
+	(preg_match('/^Asterisk SVN-(\d+(\.\d+)*)(-?(.*))$/', $verinfo, $matches)) ||
+	(preg_match('/^Asterisk GIT-(\d+(\.\d+)*)(-?(.*))$/', $verinfo, $matches))) {
 	if ((version_compare($matches[1], "1.8") < 0)) {
 		fatal("Asterisk 1.6, 1.8, 10, 11 or 12 is required for this version of FreePBX. Detected version is: ".$matches[1]);
 	}
@@ -1291,7 +1299,8 @@ if ((preg_match('/^Asterisk (\d+(\.\d+)*)(-?(.*))$/', $verinfo, $matches)) || (p
 	out("{$matches[1]}");
 	$asterisk_version = '1.4'; //Not really, but this makes sure that proper execution occurs later on reload commands, etc.
 
-} elseif ($asterisk_version = preg_match('/^Asterisk SVN.+/', $verinfo)) {
+} elseif ($asterisk_version = preg_match('/^Asterisk SVN.+/', $verinfo) ||
+		$asterisk_version = preg_match('/^Asterisk GIT.+/', $verinfo)) {
 	out("FAIL");
 	out("*** WARNING ***");
 	out("You are not using a released version of Asterisk. We are unable to verify");
@@ -1491,21 +1500,6 @@ if ($install_files) {
 	if (!is_dir("/var/spool/asterisk/voicemail/device")) amp_mkdir("/var/spool/asterisk/voicemail/device", "0755", true);
 	$copy_lang = ($make_links) ? "linked" : "copied";
 	out("OK (".$num_copied." files ".$copy_lang.", ".($num_files-$num_copied)." skipped)");
-
-	// link the packed js library for ARI, if there the error will indicate that
-	$libfreepbx = $amp_conf['AMPWEBROOT'].'/admin/common/libfreepbx.javascripts.js';
-	$dest_libfreepbx = $amp_conf['AMPWEBROOT'].'/recordings/theme/js/libfreepbx.javascripts.js';
-	if (!file_exists($amp_conf['AMPWEBROOT'].'/recordings/theme/js')) {
-		mkdir($amp_conf['AMPWEBROOT'].'/recordings/theme/js',0755, true);
-	}
-	if (file_exists($libfreepbx) && !file_exists($dest_libfreepbx)) {
-		outn(_("linking libfreepbx.javascripts.js to theme/js.."));
-		if (link($libfreepbx, $dest_libfreepbx)) {
-			out(_("ok"));
-		} else {
-			out(_("possible error - check warning message"));
-		}
-	}
 }
 
 if (!$dryrun) {

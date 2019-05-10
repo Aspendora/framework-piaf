@@ -185,7 +185,7 @@ class Freepbx_conf {
    */
   private $depreciatedSettings = array(
     "USEDEVSTATE" => true,
-    "USEQUEUESTATE" => false
+    "USEQUEUESTATE" => true
   );
 
 
@@ -246,6 +246,11 @@ class Freepbx_conf {
     foreach($this->depreciatedSettings as $keyword => $value) {
       if(isset($this->db_conf_store[$keyword])) {
         $dp[] = $keyword;
+      } else {
+        $this->db_conf_store[$keyword] = array(
+          "value" => $value,
+          "hidden" => true
+        );
       }
       $this->conf[$keyword] = $value;
     }
@@ -254,8 +259,8 @@ class Freepbx_conf {
     }
   }
 
-  public function update($keyword, $value, $commit=true) {
-    return $this->set_conf_values(array($keyword => $value), $commit);
+  public function update($keyword, $value, $commit=true, $override_readonly=true) {
+    return $this->set_conf_values(array($keyword => $value), $commit, $override_readonly);
   }
 
   public function get($keyword, $passthru=false) {
@@ -966,7 +971,7 @@ class Freepbx_conf {
 		return 0;
 	}
     foreach ($this->db_conf_store as $keyword => $atrib) {
-      if (!$atrib['modified']) {
+      if (!isset($atrib['modified'])) {
         continue;
       }
       //TODO: confirm that prepare with ? does an escapeSimple() or equiv, the docs say so

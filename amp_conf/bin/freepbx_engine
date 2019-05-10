@@ -270,7 +270,7 @@ chown_asterisk() {
 	chown $AMPASTERISKWEBUSER:$AMPASTERISKWEBGROUP $AMPWEBROOT
 	chown $AMPASTERISKWEBUSER:$AMPASTERISKWEBGROUP $AMPWEBROOT/* 2>/dev/null # Silence dangling symlink errors, cleared later
 
-	chown $AMPASTERISKUSER:$AMPASTERISKGROUP /usr/local/sbin/amportal
+	chown $AMPASTERISKUSER:$AMPASTERISKGROUP $AMPSBIN/amportal
 
 	ASTHOME=`sudo -u $AMPASTERISKUSER -H -s eval 'echo $HOME'`
 	if [ -n "$ASTHOME" ] && [ -d "$ASTHOME" ]
@@ -720,7 +720,7 @@ options:
 
 ${b}externalip$bx|${b}extip$bx: Returns the external ip for the default gateway
 ${b}dbug$bx:		Shows the freepbx debug log file and any update
-${b}context$bx|${b}cxt$bx:   Show's the specified context from the dialplan. This is extremely
+${b}context$bx|${b}ctx$bx:   Show's the specified context from the dialplan. This is extremely
                useful when developing dialplan on a system with many modules,
                where it is not feasible to look thru the whole extensions_additional
                every time to see how a specific context was generated.

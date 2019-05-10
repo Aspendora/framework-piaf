@@ -63,17 +63,7 @@ class Ajax extends FreePBX_Helpers {
 			$this->ajaxError(403, 'ajaxRequest declined');
 		}
 
-		if (method_exists($thisModule, "ajaxCustomHandler")) {
-			$ret = $thisModule->ajaxCustomHandler();
-			if($ret === true) {
-				exit;
-			}
-		}
-
-		if ($this->settings['allowremote'] === true) {
-			// You don't want to do this, honest.
-			header('Access-Control-Allow-Origin: *');
-		} else {
+		if($this->settings['allowremote'] !== true) {
 			// Try to avoid CSRF issues.
 			if (!isset($_SERVER['HTTP_REFERER'])) {
 				$this->ajaxError(403, 'ajaxRequest declined - Referrer');
@@ -105,6 +95,13 @@ class Ajax extends FreePBX_Helpers {
 
 		if (!method_exists($thisModule, "ajaxHandler")) {
 			$this->ajaxError(501, 'ajaxHandler not found');
+		}
+
+		if (method_exists($thisModule, "ajaxCustomHandler")) {
+			$ret = $thisModule->ajaxCustomHandler();
+			if($ret === true) {
+				exit;
+			}
 		}
 
 		// Right. Now we can actually do it!
@@ -340,6 +337,9 @@ class Ajax extends FreePBX_Helpers {
 	 */
 	private function sendHeaders() {
 		//send http header
+		if (headers_sent()) {
+			return;
+		}
 		if (isset($this->headers['HTTP/1.1'])) {
 			header('HTTP/1.1 ' . $this->headers['HTTP/1.1']);
 			unset($this->headers['HTTP/1.1']);
@@ -351,7 +351,7 @@ class Ajax extends FreePBX_Helpers {
 		if ($this->headers) {
 			foreach ($this->headers as $k => $v) {
 				header($k . ': ' . $v);
-				//unlist sent headers, as this mehtod can be called more than once
+				//unlist sent headers, as this method can be called more than once
 				unset($this->headers[$k]);
 			}
 		}
@@ -359,7 +359,13 @@ class Ajax extends FreePBX_Helpers {
 		//CORS: http://en.wikipedia.org/wiki/Cross-origin_resource_sharing
 		header('Access-Control-Allow-Headers:Content-Type, Depth, User-Agent, X-File-Size, X-Requested-With, If-Modified-Since, X-File-Name, Cache-Control, X-Auth-Token');
 		header('Access-Control-Allow-Methods: '.strtoupper($this->req->headers->verb));
-		header('Access-Control-Allow-Origin:*');
+		if ($this->settings['allowremote'] === true) {
+			// You don't want to do this, honest.
+			header('Access-Control-Allow-Origin: *');
+		} else {
+			$url = "http" . ((isset($_SERVER['HTTPS']) && $_SERVER["HTTPS"] == "on") ? "s://" : "://") . $_SERVER['HTTP_HOST'];
+			header('Access-Control-Allow-Origin: $url');
+		}
 		header('Access-Control-Max-Age:86400');
 		header('Allow: '.strtoupper($this->req->headers->verb));
 	}
